@@ -1,12 +1,17 @@
 package com.tutorial.crud.controller;
 
+import com.google.common.base.Joiner;
+import com.tutorial.crud.util.ProductSpecificationsBuilder;
 import com.tutorial.crud.dto.Mensaje;
 import com.tutorial.crud.dto.ProductoDto;
 import com.tutorial.crud.entity.Producto;
+import com.tutorial.crud.repository.ProductoRepository;
 import com.tutorial.crud.service.ProductoService;
+import com.tutorial.crud.util.SearchOperation;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,11 +19,16 @@ import org.springframework.web.bind.annotation.*;
 import springfox.documentation.annotations.ApiIgnore;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/producto")
 @CrossOrigin(origins = "*")
 public class ProductoController {
+
+    @Autowired
+    ProductoRepository productoRepository;
 
     @Autowired
     ProductoService productoService;
@@ -48,7 +58,7 @@ public class ProductoController {
         return new ResponseEntity(producto, HttpStatus.OK);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    //@PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/create")
     public ResponseEntity<?> create(@RequestBody ProductoDto productoDto){
         if(StringUtils.isBlank(productoDto.getNombre()))
@@ -90,5 +100,21 @@ public class ProductoController {
         return new ResponseEntity(new Mensaje("producto eliminado"), HttpStatus.OK);
     }
 
+    @GetMapping("/detailproduct/{search}")
+    public ResponseEntity <List<Producto>> findAllBySpecification(@PathVariable("search") String search){
+        ProductSpecificationsBuilder builder = new ProductSpecificationsBuilder();
+        String operationSetExper = Joiner.on("|")
+                .join(SearchOperation.SIMPLE_OPERATION_SET);
+        Pattern pattern = Pattern.compile("(\\w+?)(" + operationSetExper + ")(\\p{Punct}?)(\\w+?)(\\p{Punct}?),");
+        Matcher matcher = pattern.matcher(search + ",");
+        while (matcher.find()) {
+            builder.with(matcher.group(1), matcher.group(2), matcher.group(4), matcher.group(3), matcher.group(5));
+        }
+
+        Specification<Producto> spec = builder.build();
+        List<Producto> lista = productoRepository.findAll(spec);
+
+        return new ResponseEntity(lista, HttpStatus.OK);
+    }
 
 }
